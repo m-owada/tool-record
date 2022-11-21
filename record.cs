@@ -2,6 +2,9 @@ using System;
 using System.Drawing;
 using System.IO;
 using System.Reflection;
+using System.Speech.AudioFormat;
+using System.Speech.Recognition;
+using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 using NAudio.CoreAudioApi;
@@ -44,6 +47,7 @@ class Program
 class MainForm : Form
 {
     private ListBox listBox = new ListBox();
+    private ContextMenuStrip contextMenu = new ContextMenuStrip();
     private TextBox textBox = new TextBox();
     private ComboBox comboBox = new ComboBox();
     private CheckBox checkBox = new CheckBox();
@@ -76,6 +80,11 @@ class MainForm : Form
         listBox.SelectionMode = SelectionMode.One;
         listBox.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
         this.Controls.Add(listBox);
+        
+        // コンテキストメニュー
+        contextMenu.Items.Add("再生", null, Menu1ClickListBox);
+        contextMenu.Items.Add("解析", null, Menu2ClickListBox);
+        contextMenu.Items.Add("削除", null, Menu3ClickListBox);
         
         // テキストボックス
         textBox.Text = recorder.Device.ToString();
@@ -150,6 +159,16 @@ class MainForm : Form
     private void MouseDownListBox(object sender, MouseEventArgs e)
     {
         mousePoint = e.Location;
+        if(e.Button == MouseButtons.Right)
+        {
+            listBox.ContextMenuStrip = new ContextMenuStrip();
+            int index = listBox.IndexFromPoint(mousePoint);
+            if(index >= 0)
+            {
+                listBox.SelectedIndex = index;
+                listBox.ContextMenuStrip = contextMenu;
+            }
+        }
     }
     
     private void DoubleClickListBox(object sender, EventArgs e)
@@ -159,6 +178,51 @@ class MainForm : Form
         {
             listBox.SelectedIndex = index;
             PlayStart();
+        }
+    }
+    
+    private void Menu1ClickListBox(object sender, EventArgs e)
+    {
+        PlayStart();
+    }
+    
+    private void Menu2ClickListBox(object sender, EventArgs e)
+    {
+        var path = saveDirectory + @"\" + listBox.Text;
+        if(File.Exists(path))
+        {
+            var subForm = new SubForm(formName, this.TopMost, path);
+            subForm.ShowDialog();
+        }
+        else
+        {
+            MessageBox.Show("ファイルが存在しません。", formName, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            AddItemsListBox();
+        }
+    }
+    
+    private void Menu3ClickListBox(object sender, EventArgs e)
+    {
+        if(MessageBox.Show("ファイルを削除しますか？", formName, MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) == DialogResult.Yes)
+        {
+            var path = saveDirectory + @"\" + listBox.Text;
+            var fi = new FileInfo(path);
+            if(fi.Exists)
+            {
+                if(!fi.IsReadOnly)
+                {
+                    fi.Delete();
+                }
+                else
+                {
+                    MessageBox.Show("ファイルが読み取り専用です。", formName, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            else
+            {
+                MessageBox.Show("ファイルが存在しません。", formName, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            AddItemsListBox();
         }
     }
     
@@ -319,6 +383,119 @@ class MainForm : Form
     }
 }
 
+class SubForm : Form
+{
+    private Recognition recognition = new Recognition();
+    private TextBox textBox = new TextBox();
+    private string formName = string.Empty;
+    
+    public SubForm(string name, bool topMost, string path)
+    {
+        // 音声認識
+        recognition.Start(path);
+        recognition.Recognized += RecognitionRecognized;
+        recognition.Completed += RecognitionCompleted;
+        
+        // フォーム
+        this.Text = name + " (解析中)";
+        this.Size = new Size(400, 360);
+        this.MinimumSize = this.Size;
+        this.StartPosition = FormStartPosition.CenterScreen;
+        this.FormBorderStyle = FormBorderStyle.Sizable;
+        this.TopMost = topMost;
+        this.FormClosing += OnFormClosing;
+        
+        // テキストボックス
+        textBox.Text = string.Empty;
+        textBox.Location = new Point(10, 10);
+        textBox.Size = new Size(365, 270);
+        textBox.ReadOnly = true;
+        textBox.Multiline = true;
+        textBox.ScrollBars = ScrollBars.Vertical;
+        textBox.WordWrap = true;
+        textBox.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+        this.Controls.Add(textBox);
+        
+        // ラベル（サンプルレート）
+        var label1 = new Label();
+        label1.Text = "サンプルレート";
+        label1.Location = new Point(10, 290);
+        label1.Size = new Size(label1.PreferredWidth, 20);
+        label1.TextAlign = ContentAlignment.MiddleLeft;
+        label1.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+        this.Controls.Add(label1);
+        
+        // テキストボックス（サンプルレート）
+        var textBox1 = new TextBox();
+        textBox1.Text = recognition.SampleRate.ToString("#,0");
+        textBox1.Location = new Point(85, 290);
+        textBox1.Size = new Size(50, 20);
+        textBox1.ReadOnly = true;
+        textBox1.TextAlign = HorizontalAlignment.Center;
+        textBox1.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+        this.Controls.Add(textBox1);
+        
+        // ラベル（ビット／サンプル）
+        var label2 = new Label();
+        label2.Text = "ビット／サンプル";
+        label2.Location = new Point(145, 290);
+        label2.Size = new Size(label2.PreferredWidth, 20);
+        label2.TextAlign = ContentAlignment.MiddleLeft;
+        label2.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+        this.Controls.Add(label2);
+        
+        // テキストボックス（ビット／サンプル）
+        var textBox2 = new TextBox();
+        textBox2.Text = recognition.BitsPerSample.ToString("#,0");
+        textBox2.Location = new Point(225, 290);
+        textBox2.Size = new Size(30, 20);
+        textBox2.ReadOnly = true;
+        textBox2.TextAlign = HorizontalAlignment.Center;
+        textBox2.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+        this.Controls.Add(textBox2);
+        
+        // ラベル（チャンネル）
+        var label3 = new Label();
+        label3.Text = "チャンネル";
+        label3.Location = new Point(265, 290);
+        label3.Size = new Size(label3.PreferredWidth, 20);
+        label3.TextAlign = ContentAlignment.MiddleLeft;
+        label3.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+        this.Controls.Add(label3);
+        
+        // テキストボックス（チャンネル）
+        var textBox3 = new TextBox();
+        textBox3.Text = recognition.Channels == 1 ? "モノラル" : "ステレオ";
+        textBox3.Location = new Point(320, 290);
+        textBox3.Size = new Size(55, 20);
+        textBox3.ReadOnly = true;
+        textBox3.TextAlign = HorizontalAlignment.Center;
+        textBox3.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+        this.Controls.Add(textBox3);
+        
+        formName = name;
+    }
+    
+    private void RecognitionRecognized(object sender, SpeechRecognizedEventArgs e)
+    {
+        if(textBox.Text != string.Empty)
+        {
+            textBox.Text += Environment.NewLine;
+        }
+        textBox.Text += e.Result.Text;
+    }
+    
+    private void RecognitionCompleted(object sender, RecognizeCompletedEventArgs e)
+    {
+        this.Text = formName + " (完了)";
+    }
+    
+    private void OnFormClosing(object sender, FormClosingEventArgs e)
+    {
+        recognition.Dispose();
+    }
+}
+
 class Player : IDisposable
 {
     public bool IsPlaying { get; private set; }
@@ -346,7 +523,10 @@ class Player : IDisposable
         Stop();
         Dispose();
         GC.Collect();
-        Stopped(this, EventArgs.Empty);
+        if(Stopped != null)
+        {
+            Stopped(this, EventArgs.Empty);
+        }
     }
     
     public void Start(string path)
@@ -448,7 +628,10 @@ class Recorder : IDisposable
         WriteMp3();
         Dispose();
         GC.Collect();
-        Stopped(this, EventArgs.Empty);
+        if(Stopped != null)
+        {
+            Stopped(this, EventArgs.Empty);
+        }
     }
     
     private void WriteMp3()
@@ -516,6 +699,107 @@ class Recorder : IDisposable
         {
             audioStream.Dispose();
             audioStream = null;
+        }
+    }
+}
+
+class Recognition : IDisposable
+{
+    public int SampleRate { get; private set; }
+    public int BitsPerSample { get; private set; }
+    public int Channels { get; private set; }
+    public bool IsRecognizing { get; private set; }
+    
+    public event EventHandler<SpeechRecognizedEventArgs> Recognized;
+    public event EventHandler<RecognizeCompletedEventArgs> Completed;
+    
+    private SpeechRecognitionEngine engine;
+    
+    public Recognition()
+    {
+        IsRecognizing = false;
+    }
+    
+    public void Init(string path)
+    {
+        using(var reader = new MediaFoundationReader(path))
+        {
+            SampleRate = reader.WaveFormat.SampleRate;
+            BitsPerSample = reader.WaveFormat.BitsPerSample;
+            Channels = reader.WaveFormat.Channels;
+            engine = new SpeechRecognitionEngine(Application.CurrentCulture);
+            engine.LoadGrammar(new DictationGrammar());
+            engine.SetInputToAudioStream(reader, new SpeechAudioFormatInfo(SampleRate, ConvBitsPerSample(BitsPerSample), ConvChannels(Channels)));
+            engine.SpeechRecognized += SpeechRecognized;
+            engine.RecognizeCompleted += RecognizeCompleted;
+            engine.RecognizeAsync(RecognizeMode.Multiple);
+        }
+    }
+    
+    private AudioBitsPerSample ConvBitsPerSample(int bps)
+    {
+        if(bps == 8)
+        {
+            return AudioBitsPerSample.Eight;
+        }
+        else
+        {
+            return AudioBitsPerSample.Sixteen;
+        }
+    }
+    
+    private AudioChannel ConvChannels(int channels)
+    {
+        if(channels == 1)
+        {
+            return AudioChannel.Mono;
+        }
+        else
+        {
+            return AudioChannel.Stereo;
+        }
+    }
+    
+    public void Start(string path)
+    {
+        Init(path);
+        IsRecognizing = true;
+    }
+    
+    public void Stop()
+    {
+        if(IsRecognizing)
+        {
+            engine.RecognizeAsyncStop();
+            IsRecognizing = false;
+        }
+    }
+    
+    private void SpeechRecognized(object sender, SpeechRecognizedEventArgs e)
+    {
+        if(e.Result != null && Recognized != null)
+        {
+            Recognized(this, e);
+        }
+    }
+    
+    private void RecognizeCompleted(object sender, RecognizeCompletedEventArgs e)
+    {
+        if(e.Result != null && Completed != null)
+        {
+            Stop();
+            Completed(this, e);
+        }
+    }
+    
+    public void Dispose()
+    {
+        if(engine != null)
+        {
+            engine.SpeechRecognized -= SpeechRecognized;
+            engine.RecognizeCompleted -= RecognizeCompleted;
+            engine.Dispose();
+            engine = null;
         }
     }
 }
