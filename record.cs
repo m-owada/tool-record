@@ -492,6 +492,10 @@ class SubForm : Form
     
     private void OnFormClosing(object sender, FormClosingEventArgs e)
     {
+        if(recognition.IsRecognizing)
+        {
+            this.Text = formName + " (停止中)";
+        }
         recognition.Dispose();
     }
 }
