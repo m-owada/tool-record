@@ -49,6 +49,7 @@ class MainForm : Form
     private ListBox listBox = new ListBox();
     private ContextMenuStrip contextMenu = new ContextMenuStrip();
     private TextBox textBox = new TextBox();
+    private TrackBar trackBar = new TrackBar();
     private ComboBox comboBox = new ComboBox();
     private CheckBox checkBox = new CheckBox();
     private Button buttonPlay = new Button();
@@ -65,7 +66,7 @@ class MainForm : Form
     public MainForm()
     {
         // フォーム
-        this.Size = new Size(340, 220);
+        this.Size = new Size(340, 250);
         this.MinimumSize = this.Size;
         this.StartPosition = FormStartPosition.CenterScreen;
         this.FormBorderStyle = FormBorderStyle.Sizable;
@@ -94,17 +95,32 @@ class MainForm : Form
         textBox.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
         this.Controls.Add(textBox);
         
+        // トラックバー
+        trackBar.Location = new Point(10, 150);
+        trackBar.Size = new Size(305, 20);
+        trackBar.AutoSize = false;
+        trackBar.TickStyle = TickStyle.None;
+        trackBar.Minimum = 0;
+        trackBar.TickFrequency = 1;
+        trackBar.SmallChange = 1;
+        trackBar.LargeChange = 10;
+        trackBar.Enabled = false;
+        trackBar.Scroll += ScrollTrackBar;
+        trackBar.EnabledChanged += EnabledChangedTrackBar;
+        trackBar.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+        this.Controls.Add(trackBar);
+        
         // ラベル
         var label = new Label();
         label.Text = "ビットレート";
-        label.Location = new Point(10, 150);
+        label.Location = new Point(10, 180);
         label.Size = new Size(label.PreferredWidth, 20);
         label.TextAlign = ContentAlignment.MiddleLeft;
         label.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
         this.Controls.Add(label);
         
         // コンボボックス
-        comboBox.Location = new Point(70, 150);
+        comboBox.Location = new Point(70, 180);
         comboBox.Size = new Size(70, 20);
         comboBox.Items.Add("96kbps");
         comboBox.Items.Add("128kbps");
@@ -118,7 +134,7 @@ class MainForm : Form
         // チェックボックス
         checkBox.CheckedChanged += CheckedChangedCheckBox;
         checkBox.Text = "最前面";
-        checkBox.Location = new Point(150, 150);
+        checkBox.Location = new Point(150, 180);
         checkBox.Size = new Size(70, 20);
         checkBox.Checked = true;
         checkBox.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
@@ -127,7 +143,7 @@ class MainForm : Form
         // 再生ボタン
         buttonPlay.Click += ClickButtonPlay;
         buttonPlay.Text = "再生";
-        buttonPlay.Location = new Point(230, 150);
+        buttonPlay.Location = new Point(230, 180);
         buttonPlay.Size = new Size(40, 20);
         buttonPlay.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
         this.Controls.Add(buttonPlay);
@@ -135,7 +151,7 @@ class MainForm : Form
         // 録音ボタン
         buttonRec.Click += ClickButtonRec;
         buttonRec.Text = "録音";
-        buttonRec.Location = new Point(275, 150);
+        buttonRec.Location = new Point(275, 180);
         buttonRec.Size = new Size(40, 20);
         buttonRec.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
         this.Controls.Add(buttonRec);
@@ -226,6 +242,16 @@ class MainForm : Form
         }
     }
     
+    private void ScrollTrackBar(object sender, EventArgs e)
+    {
+        player.SetCurrentTime(new TimeSpan(0, 0, trackBar.Value));
+    }
+    
+    private void EnabledChangedTrackBar(object sender, EventArgs e)
+    {
+        trackBar.Value = 0;
+    }
+    
     private void CheckedChangedCheckBox(object sender, EventArgs e)
     {
         this.TopMost = checkBox.Checked;
@@ -269,6 +295,7 @@ class MainForm : Form
     private void ClickButtonPlayEnabled(bool enabled)
     {
         listBox.Enabled = enabled;
+        trackBar.Enabled = !enabled;
         comboBox.Enabled = enabled;
         buttonPlay.Enabled = true;
         buttonRec.Enabled = enabled;
@@ -310,6 +337,7 @@ class MainForm : Form
     private void ClickButtonRecEnabled(bool enabled)
     {
         listBox.Enabled = enabled;
+        trackBar.Enabled = false;
         comboBox.Enabled = enabled;
         buttonPlay.Enabled = enabled;
         buttonRec.Enabled = true;
@@ -374,6 +402,8 @@ class MainForm : Form
         if(player.IsPlaying)
         {
             time = player.GetTime();
+            trackBar.Maximum = (int)player.GetTotalTime().TotalSeconds;
+            trackBar.Value = (int)time.TotalSeconds;
         }
         else if(recorder.IsRecording)
         {
@@ -398,7 +428,7 @@ class SubForm : Form
         
         // フォーム
         this.Text = name + " (解析中)";
-        this.Size = new Size(400, 360);
+        this.Size = new Size(480, 360);
         this.MinimumSize = this.Size;
         this.StartPosition = FormStartPosition.CenterScreen;
         this.FormBorderStyle = FormBorderStyle.Sizable;
@@ -408,7 +438,7 @@ class SubForm : Form
         // テキストボックス
         textBox.Text = string.Empty;
         textBox.Location = new Point(10, 10);
-        textBox.Size = new Size(365, 270);
+        textBox.Size = new Size(445, 270);
         textBox.ReadOnly = true;
         textBox.Multiline = true;
         textBox.ScrollBars = ScrollBars.Vertical;
@@ -435,19 +465,19 @@ class SubForm : Form
         textBox1.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
         this.Controls.Add(textBox1);
         
-        // ラベル（ビット／サンプル）
+        // ラベル（ビット/サンプル）
         var label2 = new Label();
-        label2.Text = "ビット／サンプル";
+        label2.Text = "ビット/サンプル";
         label2.Location = new Point(145, 290);
         label2.Size = new Size(label2.PreferredWidth, 20);
         label2.TextAlign = ContentAlignment.MiddleLeft;
         label2.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
         this.Controls.Add(label2);
         
-        // テキストボックス（ビット／サンプル）
+        // テキストボックス（ビット/サンプル）
         var textBox2 = new TextBox();
         textBox2.Text = recognition.BitsPerSample.ToString("#,0");
-        textBox2.Location = new Point(225, 290);
+        textBox2.Location = new Point(220, 290);
         textBox2.Size = new Size(30, 20);
         textBox2.ReadOnly = true;
         textBox2.TextAlign = HorizontalAlignment.Center;
@@ -457,7 +487,7 @@ class SubForm : Form
         // ラベル（チャンネル）
         var label3 = new Label();
         label3.Text = "チャンネル";
-        label3.Location = new Point(265, 290);
+        label3.Location = new Point(260, 290);
         label3.Size = new Size(label3.PreferredWidth, 20);
         label3.TextAlign = ContentAlignment.MiddleLeft;
         label3.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
@@ -466,12 +496,31 @@ class SubForm : Form
         // テキストボックス（チャンネル）
         var textBox3 = new TextBox();
         textBox3.Text = recognition.Channels == 1 ? "モノラル" : "ステレオ";
-        textBox3.Location = new Point(320, 290);
-        textBox3.Size = new Size(55, 20);
+        textBox3.Location = new Point(315, 290);
+        textBox3.Size = new Size(50, 20);
         textBox3.ReadOnly = true;
         textBox3.TextAlign = HorizontalAlignment.Center;
         textBox3.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
         this.Controls.Add(textBox3);
+        
+        // ラベル（長さ）
+        var label4 = new Label();
+        label4.Text = "長さ";
+        label4.Location = new Point(375, 290);
+        label4.Size = new Size(label4.PreferredWidth, 20);
+        label4.TextAlign = ContentAlignment.MiddleLeft;
+        label4.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+        this.Controls.Add(label4);
+        
+        // テキストボックス（長さ）
+        var textBox4 = new TextBox();
+        textBox4.Text = recognition.TotalTime.ToString(@"hh\:mm\:ss");
+        textBox4.Location = new Point(405, 290);
+        textBox4.Size = new Size(50, 20);
+        textBox4.ReadOnly = true;
+        textBox4.TextAlign = HorizontalAlignment.Center;
+        textBox4.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+        this.Controls.Add(textBox4);
         
         formName = name;
     }
@@ -573,6 +622,14 @@ class Player : IDisposable
         else
         {
             return new TimeSpan();
+        }
+    }
+    
+    public void SetCurrentTime(TimeSpan time)
+    {
+        if(IsPlaying)
+        {
+            audioReader.CurrentTime = time;
         }
     }
     
@@ -712,6 +769,7 @@ class Recognition : IDisposable
     public int SampleRate { get; private set; }
     public int BitsPerSample { get; private set; }
     public int Channels { get; private set; }
+    public TimeSpan TotalTime { get; private set; }
     public bool IsRecognizing { get; private set; }
     
     public event EventHandler<SpeechRecognizedEventArgs> Recognized;
@@ -731,6 +789,7 @@ class Recognition : IDisposable
             SampleRate = reader.WaveFormat.SampleRate;
             BitsPerSample = reader.WaveFormat.BitsPerSample;
             Channels = reader.WaveFormat.Channels;
+            TotalTime = reader.TotalTime;
             engine = new SpeechRecognitionEngine(Application.CurrentCulture);
             engine.LoadGrammar(new DictationGrammar());
             engine.SetInputToAudioStream(reader, new SpeechAudioFormatInfo(SampleRate, ConvBitsPerSample(BitsPerSample), ConvChannels(Channels)));
