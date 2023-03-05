@@ -1,4 +1,4 @@
-# Record
+# ![Record](app.ico) Record
 
 ## 概要
 

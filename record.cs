@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Reflection;
@@ -71,6 +72,7 @@ class MainForm : Form
         this.StartPosition = FormStartPosition.CenterScreen;
         this.FormBorderStyle = FormBorderStyle.Sizable;
         this.FormClosing += OnFormClosing;
+        this.Icon = Icon.ExtractAssociatedIcon(Process.GetCurrentProcess().MainModule.FileName);
         
         // リストボックス
         listBox.MouseDown += MouseDownListBox;
@@ -434,6 +436,7 @@ class SubForm : Form
         this.FormBorderStyle = FormBorderStyle.Sizable;
         this.TopMost = topMost;
         this.FormClosing += OnFormClosing;
+        this.Icon = Icon.ExtractAssociatedIcon(Process.GetCurrentProcess().MainModule.FileName);
         
         // テキストボックス
         textBox.Text = string.Empty;
