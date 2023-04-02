@@ -52,7 +52,8 @@ class MainForm : Form
     private TextBox textBox = new TextBox();
     private TrackBar trackBar = new TrackBar();
     private ComboBox comboBox = new ComboBox();
-    private CheckBox checkBox = new CheckBox();
+    private CheckBox checkBox1 = new CheckBox();
+    private CheckBox checkBox2 = new CheckBox();
     private Button buttonPlay = new Button();
     private Button buttonRec = new Button();
     private System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
@@ -67,7 +68,7 @@ class MainForm : Form
     public MainForm()
     {
         // フォーム
-        this.Size = new Size(340, 250);
+        this.Size = new Size(400, 250);
         this.MinimumSize = this.Size;
         this.StartPosition = FormStartPosition.CenterScreen;
         this.FormBorderStyle = FormBorderStyle.Sizable;
@@ -78,7 +79,7 @@ class MainForm : Form
         listBox.MouseDown += MouseDownListBox;
         listBox.DoubleClick += DoubleClickListBox;
         listBox.Location = new Point(10, 10);
-        listBox.Size = new Size(305, 100);
+        listBox.Size = new Size(365, 100);
         listBox.IntegralHeight = false;
         listBox.SelectionMode = SelectionMode.One;
         listBox.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
@@ -92,14 +93,14 @@ class MainForm : Form
         // テキストボックス
         textBox.Text = recorder.Device.ToString();
         textBox.Location = new Point(10, 120);
-        textBox.Size = new Size(305, 20);
+        textBox.Size = new Size(365, 20);
         textBox.ReadOnly = true;
         textBox.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
         this.Controls.Add(textBox);
         
         // トラックバー
         trackBar.Location = new Point(10, 150);
-        trackBar.Size = new Size(305, 20);
+        trackBar.Size = new Size(365, 20);
         trackBar.AutoSize = false;
         trackBar.TickStyle = TickStyle.None;
         trackBar.Minimum = 0;
@@ -133,19 +134,27 @@ class MainForm : Form
         comboBox.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
         this.Controls.Add(comboBox);
         
-        // チェックボックス
-        checkBox.CheckedChanged += CheckedChangedCheckBox;
-        checkBox.Text = "最前面";
-        checkBox.Location = new Point(150, 180);
-        checkBox.Size = new Size(70, 20);
-        checkBox.Checked = true;
-        checkBox.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
-        this.Controls.Add(checkBox);
+        // チェックボックス（マイク入力）
+        checkBox1.Text = "マイク入力";
+        checkBox1.Location = new Point(150, 180);
+        checkBox1.Size = new Size(75, 20);
+        checkBox1.Checked = false;
+        checkBox1.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+        this.Controls.Add(checkBox1);
+        
+        // チェックボックス（最前面）
+        checkBox2.CheckedChanged += CheckedChangedCheckBox2;
+        checkBox2.Text = "最前面";
+        checkBox2.Location = new Point(225, 180);
+        checkBox2.Size = new Size(65, 20);
+        checkBox2.Checked = true;
+        checkBox2.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
+        this.Controls.Add(checkBox2);
         
         // 再生ボタン
         buttonPlay.Click += ClickButtonPlay;
         buttonPlay.Text = "再生";
-        buttonPlay.Location = new Point(230, 180);
+        buttonPlay.Location = new Point(290, 180);
         buttonPlay.Size = new Size(40, 20);
         buttonPlay.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
         this.Controls.Add(buttonPlay);
@@ -153,7 +162,7 @@ class MainForm : Form
         // 録音ボタン
         buttonRec.Click += ClickButtonRec;
         buttonRec.Text = "録音";
-        buttonRec.Location = new Point(275, 180);
+        buttonRec.Location = new Point(335, 180);
         buttonRec.Size = new Size(40, 20);
         buttonRec.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
         this.Controls.Add(buttonRec);
@@ -254,9 +263,9 @@ class MainForm : Form
         trackBar.Value = 0;
     }
     
-    private void CheckedChangedCheckBox(object sender, EventArgs e)
+    private void CheckedChangedCheckBox2(object sender, EventArgs e)
     {
-        this.TopMost = checkBox.Checked;
+        this.TopMost = checkBox2.Checked;
     }
     
     private void ClickButtonPlay(object sender, EventArgs e)
@@ -276,7 +285,7 @@ class MainForm : Form
         var path = saveDirectory + @"\" + listBox.Text;
         if(File.Exists(path))
         {
-            player.Start(saveDirectory + @"\" + listBox.Text);
+            player.Start(path);
             buttonPlay.Text = "停止";
             ClickButtonPlayEnabled(false);
         }
@@ -299,6 +308,7 @@ class MainForm : Form
         listBox.Enabled = enabled;
         trackBar.Enabled = !enabled;
         comboBox.Enabled = enabled;
+        checkBox1.Enabled = enabled;
         buttonPlay.Enabled = true;
         buttonRec.Enabled = enabled;
         buttonPlay.Select();
@@ -324,7 +334,7 @@ class MainForm : Form
     
     private void RecordStart()
     {
-        recorder.Start(saveDirectory, GetBitRate());
+        recorder.Start(saveDirectory, GetBitRate(), checkBox1.Checked);
         buttonRec.Text = "停止";
         ClickButtonRecEnabled(false);
     }
@@ -341,6 +351,7 @@ class MainForm : Form
         listBox.Enabled = enabled;
         trackBar.Enabled = false;
         comboBox.Enabled = enabled;
+        checkBox1.Enabled = enabled;
         buttonPlay.Enabled = enabled;
         buttonRec.Enabled = true;
         buttonRec.Select();
@@ -664,6 +675,10 @@ class Recorder : IDisposable
     private MemoryStream audioStream;
     private WaveFileWriter audioWriter;
     
+    private WaveIn waveIn;
+    private WaveOut waveOut;
+    private BufferedWaveProvider bufferedWaveProvider;
+    
     public Recorder()
     {
         MediaFoundationApi.Startup();
@@ -680,6 +695,14 @@ class Recorder : IDisposable
         audioCapture.RecordingStopped += RecordingStopped;
         SaveDirectory = directory;
         BitRate = bitRate;
+        
+        waveIn = new WaveIn();
+        waveIn.WaveFormat = audioCapture.WaveFormat;
+        waveIn.DataAvailable += DataAvailableWaveIn;
+        waveOut = new WaveOut();
+        bufferedWaveProvider = new BufferedWaveProvider(waveIn.WaveFormat);
+        bufferedWaveProvider.DiscardOnBufferOverflow = true;
+        waveOut.Init(bufferedWaveProvider);
     }
     
     private void DataAvailable(object sender, WaveInEventArgs e)
@@ -716,11 +739,22 @@ class Recorder : IDisposable
         }
     }
     
-    public void Start(string directory, int bitRate)
+    private void DataAvailableWaveIn(object sender, WaveInEventArgs e)
+    {
+        bufferedWaveProvider.AddSamples(e.Buffer, 0, e.BytesRecorded);
+    }
+    
+    public void Start(string directory, int bitRate, bool micIn = false)
     {
         Init(directory, bitRate);
         audioCapture.StartRecording();
         IsRecording = true;
+        
+        if(micIn)
+        {
+            waveIn.StartRecording();
+            waveOut.Play();
+        }
     }
     
     public void Stop()
@@ -747,6 +781,21 @@ class Recorder : IDisposable
     
     public void Dispose()
     {
+        if(bufferedWaveProvider != null)
+        {
+            bufferedWaveProvider = null;
+        }
+        if(waveOut != null)
+        {
+            waveOut.Dispose();
+            waveOut = null;
+        }
+        if(waveIn != null)
+        {
+            waveIn.DataAvailable -= DataAvailableWaveIn;
+            waveIn.Dispose();
+            waveIn = null;
+        }
         if(audioCapture != null)
         {
             audioCapture.DataAvailable -= DataAvailable;
